@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Collisions</title>
+	<link rel="stylesheet" href="webfontkit/stylesheet.css">
+
+	<style>
+		body {
+			background: #cbefff;
+			margin: 0;
+			padding: 0;
+			font-family: "arcadeclassicregular", monospace;
+			text-align: center;
+		}
+		.stats {
+			font-size: 32px;
+			padding: 10px 0;
+		}
+		.stats:after {
+			content: '';
+			display: table;
+			clear: both;
+		}
+		#timer {
+			float: right;
+		}
+		canvas {
+			margin: 10px auto;
+			display: block;
+			border-radius: 4px;
+			box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+		}
+		button {
+			background: none;
+			border: none;
+			font-family: "arcadeclassicregular", monospace;	
+		}
+
+		.playarea {
+			margin-top: 40px;
+			position: relative;
+		}
+
+		@keyframes blink {
+			0% {
+				opacity: 1;
+			}
+			50% {
+				opacity: 0;
+			}
+		}
+
+		.overlay {
+			display: none;
+			position: absolute;
+			font-size: 40px;
+			text-align: center;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			color: #EEE;
+			line-height: 400px;
+			background: rgba(0, 0, 0, 0.4);
+		}
+		.overlay-text {
+			animation: blink 1s infinite;
+		}
+		.is-paused .overlay {
+			display: block;
+		}
+	</style>
+</head>
+<body>
+	<div class="playarea">
+		<canvas class="js-playarea" width="700" height="800"></canvas>
+		<div class="overlay">
+			<span class="overlay-text">PAUSED</span>
+		</div>
+	</div>
+
+	<script src="main.js"></script>
+	<!-- <script src="/build/assets/js/main.min.js"></script> -->
+</body>
+</html>
