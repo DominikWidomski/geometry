@@ -18,8 +18,48 @@ function add(v1, v2) {
 	return {x: v1.x + v2.x, y: v1.y + v2.y};
 }
 
+function subtract(v1, v2) {
+	return {x: v1.x - v2.x, y: v1.y - v2.y};
+}
+
+function multiply(vector, scalar) {
+	return { x: vector.x * scalar, y: vector.y * scalar };
+}
+
+function divide(vector, scalar) {
+	if (scalar === 0) {
+		throw new Error('Cannot divide by 0');
+	}
+
+	return { x: vector.x / scalar, y: vector.y / scalar };
+}
+
+const deg2rad = (angleDegrees) => angleDegrees * Math.PI / 180;
+
+const rotate = (vector, angleDegrees) => {
+	const theta = deg2rad(angleDegrees);
+
+	const	px = vector.x * Math.cos(theta) - vector.y * Math.sin(theta); 
+	const py = vector.x * Math.sin(theta) + vector.y * Math.cos(theta);
+
+	return { x: px, y: py };
+}
+
+
 const vertexScale = 8;
+// TODO: This should be passed the ctx to which to draw
 function drawVertex(x, y) {
+	// Can pass a vertex object
+	if(typeof x === "object") {
+		if(typeof x.x === "number" && typeof x.y === "number") {
+			// Maybe avoid doing this because the order of this re-assignment matters of course.
+			y = x.y;
+			x = x.x;
+		} else {
+			throw new Error("Invalid vertex object passed");
+		}
+	}
+
 	ctx.fillStyle = 'yellow';
 	ctx.fillRect(x - vertexScale/2, y - vertexScale/2, vertexScale, vertexScale);
 }
@@ -43,6 +83,11 @@ function drawInfiniteLineParametric(ctx, gradient, yIntercept) {
 	ctx.stroke();
 }
 
+function getLineGradient(v1, v2) {
+	// gradient = rise (y) / run (x);
+	return (v2.y - v1.y) / (v2.x - v1.x)
+}
+
 /**
  * Draw infinite line passing through two points
  * @param {CanvasRenderingContext2D} ctx
@@ -52,12 +97,45 @@ function drawInfiniteLineParametric(ctx, gradient, yIntercept) {
 function drawInfiniteLine(ctx, v1, v2) {	
 	// drawVertex(v1.x, v1.y);
 	// drawVertex(v2.x, v2.y);
-	// gradient = rise / run;
-	const m = (v2.y - v1.y) / (v2.x - v1.x);
+	const m = getLineGradient(v1, v2);
 	// y-intercept
 	const b = v1.y - m * v1.x;
 
 	drawInfiniteLineParametric(ctx, m, b);
+}
+
+const LINE_NORMAL_LENGTH = 30;
+function drawLineNormal(ctx, v1, v2) {
+	// const m1 = getLineGradient(v1, v2);
+	// const m2 = m1 === 0 ? 1 : -1 / m1;
+	// const b = v1.y - m2 * v1.x;
+
+	// FRONT
+	const dx = v2.x - v1.x;
+	// BACK
+	const dy = v2.y - v1.y;
+
+	const aN = subtract(v1, v1);
+	const bN = subtract(v2, v1);
+	const halfPointN = add(aN, multiply(bN, 0.5));
+	const halfPoint = add(v1, halfPointN);
+
+	drawVertex(halfPoint);
+	
+	// TODO: Normalise them normals lol
+	// Front Normal
+	const frontNormalDirection = {x: -dy, y: dx};
+	// const frontNormal = add(halfPoint, frontNormalDirection);
+	// I'm sure there's a general name for this operation like "add components"
+	const frontMag = Math.sqrt(frontNormalDirection.x * frontNormalDirection.x + frontNormalDirection.y * frontNormalDirection.y);
+	const frontNormalUnitVector = multiply(frontNormalDirection, 1/frontMag);
+	const frontNormalRepresentation = multiply(frontNormalUnitVector, LINE_NORMAL_LENGTH);
+
+	ctx.strokeStyle = 'yellow';
+	drawLine(ctx, halfPoint, add(halfPoint, frontNormalRepresentation));
+
+	// Back Normal
+	// drawLine(ctx, halfPoint, add(halfPoint, {x: dy, y: -dx}));
 }
 
 function drawLine(ctx, v1, v2) {
@@ -65,6 +143,43 @@ function drawLine(ctx, v1, v2) {
 	ctx.moveTo(v1.x, v1.y);
 	ctx.lineTo(v2.x, v2.y);
 	ctx.stroke();
+}
+
+class Point {
+	// anchor as a ratio between the points (0 - 1), middle by default
+	constructor(x, y) {
+		this._x = x;
+		this._y = y;
+	}
+
+	// Don't know why I'd need this stuff really 🤔 Not for everything, everywhere right?
+	get x () { return this._x; }
+	get y () { return this._y; }
+
+	render(ctx) {
+		drawVertex(this._x, this._y);
+	}
+}
+
+const findPointAlongsideVector = (a, b, ratio) => add(a, multiply(subtract(b, a), ratio))
+
+class Line {
+	// anchor as a ratio between the points (0 - 1), middle by default
+	constructor(pointA, pointB, anchor = 0.5) {
+		this._a = pointA;
+		this._b = pointB;
+
+		this._anchorPoint = findPointAlongsideVector(this._a, this._b, anchor);
+	}
+
+	set anchor (newVal) {
+		this._anchorPoint = findPointAlongsideVector(this._a, this._b, newVal);
+	}
+
+	render(ctx) {
+		drawLine(ctx, this._a, this._b);
+		drawVertex(this._anchorPoint.x, this._anchorPoint.y);
+	}
 }
 
 class Circle {
@@ -82,13 +197,39 @@ class Circle {
 		ctx.fillStyle = this === hoveredObject ? 'red' : 'orange';
 		ctx.beginPath();
 		ctx.arc(this.x, this.y, this.r, 0, 2*Math.PI);
-		ctx.fill();
+
+		// ctx.fill();
+		ctx.stroke();
 
 		if (__DEBUG__) {
 			drawVertex(this.x, this.y);
 		}
 	}
 }
+
+// class Circle {
+// 	constructor(ctx, x, y, r) {
+// 		this.ctx = ctx;
+// 		this._x = x;
+// 		this._y = y;
+// 		this._r = r;
+// 	}
+
+// 	render() {
+// 		ctx.translate(this._x, this._y);
+		
+// 		ctx.beginPath();
+// 		ctx.arc(0, 0, this._r, 0, Math.PI * 2);
+// 		ctx.stroke();
+
+// 		if(DEBUG) {
+// 			drawVertex(0, 0);
+// 		}
+
+// 		// Reset transform
+// 		ctx.setTransform();
+// 	}
+// }
 
 class Rect {
 	constructor(x, y, w, h) {
@@ -207,7 +348,7 @@ function draw() {
 	rect.vertices.forEach(vertex => {
 		vertex = {x: vertex.x, y: vertex.y};
 		drawLine(ctx, circle, vertex);
-	});
+	}); 
 
 	// center to center
 	// const v2 = {x: rect.x + rect.w/2, y: rect.y + rect.h/2};
@@ -310,7 +451,90 @@ function draw() {
 	window.requestAnimationFrame(draw);
 }
 
-window.requestAnimationFrame(draw);
+let rotation = 0;
+function drawSceneB() {
+	const DEBUG = true;
+
+	ctx.fillStyle = '#222';
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+	ctx.strokeStyle = "magenta";
+	
+	// TODO: to be able to do that 2D portal thing:
+	const LA = {x: 100, y: 400};
+	const LB = {x: 200, y: 450};
+
+	// ALL OF THIS SUCKS.
+	// theres a lot of mental gymnastics going on.
+	// like everything of course is in the same coordinate system, from origin
+	// so then rotating things is quite awkward... 🤔
+	// but then, i guess thats why things are genenrally transformed anyway.
+	// Maybe can have some helpers that will generate the points in a normalised way???
+	// or lines will have internally a normalised representation and its transform?
+	// I mean thats how you would do it with a mesh. All vertices are around 0 and then you transform it right.
+	// but does that work for lines?
+	// Like I said there's a lot of mental gymnastics going on.
+	// maybe i'm not used to it, but also, maybe rather than coming up with a way to support my thinking
+	// maybe better to change my way of thinking to be more standard?
+	// I guess I'd like to be able to say "draw a line from this POINT to that POINT wherever they are"
+	// So maybe would be nice to have a POINT class that has a logical representation but underneath it can get you the normalised numbers
+	// Or basically you can pass it global values and it'll figure out normalised and its offset etc.
+
+	// draw a "portal" - 2D line representing the plane of the portal.
+	const newA = add(LA, rotate(subtract(LA, LA), rotation));
+	const newB = add(LA, rotate(subtract(LB, LA), rotation));
+	drawLine(ctx, newA, newB);
+
+	const circle = new Circle(200, 200, 100);
+
+	ctx.strokeStyle = '#F7AEF8';
+	circle.render(ctx);
+
+	const testPointA = new Point(200, 500);
+	testPointA.render(ctx);
+
+	const testPointB = new Point(240, 460);
+	testPointB.render(ctx);
+	const line = new Line(testPointA, testPointB);
+	line.render(ctx);
+	
+	// It needs to have an explicit "normal" and away of rendering it for debug
+	// This is implied from the order of vertices.
+	// drawVertex(LA);
+	// drawVertex(LB);
+	// TODO: change this to be drawLine(ctx, getLineNormal(line)); - interesting thing here is, how do we define the normal?
+	drawLineNormal(ctx, newA, newB);
+
+	// Explicit 2D view frustrum from the player's point of view.
+	// As in, I think I need it as a mathematical shape rather than just drawing out connecting some points
+	// I'd like to first draw it anyway!
+
+	const drawViewCone = (ctx, position, angle, nearDistance, farDistance) => {
+		
+	}
+	
+	// drawViewCone(ctx, position, angle, nearDistance, farDistance);
+
+	// https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_algorithm
+	// https://www.w3resource.com/html5-canvas/html5-canvas-matrix-transforms.php
+	
+	// because then we need to calculate precise intersections.
+
+	// intersecting with that portal, so 2D frustrum intersection with the plane, its edges (vertices)
+	// figure out the view through that portal (intersection of 2D frustrum behind the plane)
+	// intersection of other things with that view sub-section
+	// translate it to the other portal, (show its view as overlap I guess?)
+	// Copy and paste shapes from inside of the second portal's intersection to the first portal's intersection.
+	// That could basically be the puzzle mechanic - how to place portals and then copy things across them to complete puzzles or whatever.
+	// 	say move an object, add an object like a bridge, remove a wall or something.
+	// 	can this work in 2D???
+
+	rotation += 1;
+	window.requestAnimationFrame(drawSceneB);
+}
+
+// window.requestAnimationFrame(draw);
+window.requestAnimationFrame(drawSceneB);
 
 
 
